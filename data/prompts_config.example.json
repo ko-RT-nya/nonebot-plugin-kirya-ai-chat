@@ -1,0 +1,8 @@
+{
+  "prompts": {
+    "name": "your_prompt_here"
+  },
+  "status": {
+    "default": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "current_model": "deepseek-chat",
+  "models": {
+    "gemini-2.5-pro": "Google Gemini 2.5 Pro",
+    "gemini-2.5-flash": "Google Gemini 2.5 Flash",
+    "deepseek-chat": "DeepSeek Chat",
+    "deepseek-reasoner": "DeepSeek Reasoner"
+  },
+  "api_keys": {
+    "gemini-2.5-pro": "your_gemini_api_key_here",
+    "gemini-2.5-flash": "your_gemini_api_key_here",
+    "deepseek-chat": "your_deepseek_api_key_here",
+    "deepseek-reasoner": "your_deepseek_api_key_here"
+  },
+  "cooldowns": {
+    "gemini-2.5-pro": 15,
+    "gemini-2.5-flash": 10,
+    "deepseek-chat": 2,
+    "deepseek-reasoner": 3
+  },
+  "urls": {
+    "gemini": "https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={key}",
+    "deepseek": "https://api.deepseek.com/v1/chat/completions"
+  },
+  "proxies": {},
+  "rate_limit": {
+    "global_qps_limit": 2
+  }
+}

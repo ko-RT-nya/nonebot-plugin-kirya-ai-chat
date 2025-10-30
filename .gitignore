@@ -1,0 +1,38 @@
+# 忽略数据目录下的实际配置和用户数据
+data/core_config.json
+data/admin_config.json
+data/model_config.json
+data/prompts_config.json
+data/config.json
+data/split_config.json
+data/memories/
+
+# Python 通用忽略
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+*.log
