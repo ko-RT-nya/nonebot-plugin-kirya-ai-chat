@@ -198,6 +198,14 @@ class ConfigManager:
         # 保存配置
         return self.save_config(filename, config)
     
+    def get_data_dir(self) -> str:
+        """获取数据目录路径
+        
+        Returns:
+            数据目录的绝对路径
+        """
+        return self.data_dir
+    
     def reload_config(self, filename: str) -> Dict[str, Any]:
         """重新加载指定配置文件，忽略缓存"""
         if filename in self.configs:

@@ -50,11 +50,23 @@ async def handle_switch_model(event: MessageEvent, command_text: str) -> bool:
         return True
 
     try:
-        # 使用split()分割所有空格（支持多个空格/全角空格），取第三个元素作为模型ID
-        parts = command_text.split()
-        if len(parts) < 2:
+        # 解析命令文本，提取模型ID
+        command_str = command_text[1:].strip()  # 去除开头的反斜杠
+        if command_str.startswith("model switch"):
+            # 英文命令格式：model switch 模型ID
+            parts = command_str[12:].strip().split(" ", 1)
+            model_id = parts[0].strip()
+        else:
+            # 中文命令格式：切换模型 模型ID
+            if command_str.startswith("切换模型"):
+                model_id = command_str[4:].strip()
+            else:
+                # 兼容其他格式，取第一个空格后的内容作为模型ID
+                _, model_id = command_str.split(" ", 1)
+                model_id = model_id.strip()
+        
+        if not model_id:
             raise ValueError("缺少模型ID")
-        model_id = parts[2].strip()  # 指令格式：\切换模型 模型ID → parts[0]是'\切换模型', parts[1]是模型ID
         
         # 默认模型配置
         default_models = {
@@ -111,9 +123,31 @@ async def handle_set_api_key(event: MessageEvent, command_text: str) -> bool:
         return True
 
     try:
-        _, model_id, api_key = command_text.split(" ", 2)
-        model_id = model_id.strip()
-        api_key = api_key.strip()
+        # 解析命令文本，提取模型ID和API密钥
+        command_str = command_text[1:].strip()  # 去除开头的反斜杠
+        
+        if command_str.startswith("model setkey"):
+            # 英文命令格式：model setkey 模型ID 密钥
+            parts = command_str[12:].strip().split(" ", 1)
+            if len(parts) < 2:
+                raise ValueError("缺少API密钥")
+            model_id = parts[0].strip()
+            api_key = parts[1].strip()
+        else:
+            # 中文命令格式：设置模型密钥 模型ID 密钥
+            if command_str.startswith("设置模型密钥"):
+                parts = command_str[6:].strip().split(" ", 1)
+                if len(parts) < 2:
+                    raise ValueError("缺少API密钥")
+                model_id = parts[0].strip()
+                api_key = parts[1].strip()
+            else:
+                # 兼容其他格式
+                parts = command_str.split(" ", 2)
+                if len(parts) < 3:
+                    raise ValueError("缺少必要参数")
+                model_id = parts[1].strip()
+                api_key = parts[2].strip()
         
         if not model_id or not api_key:
             raise ValueError
@@ -150,8 +184,33 @@ async def handle_set_cooldown(event: MessageEvent, command_text: str) -> bool:
         return True
 
     try:
-        _, model_id, seconds_str = command_text.split(" ", 2)
-        model_id = model_id.strip()
+        # 解析命令文本，提取模型ID和冷却时间
+        command_str = command_text[1:].strip()  # 去除开头的反斜杠
+        
+        if command_str.startswith("model cooldown"):
+            # 英文命令格式：model cooldown 模型ID 秒数
+            parts = command_str[13:].strip().split(" ", 1)
+            if len(parts) < 2:
+                raise ValueError("缺少冷却时间")
+            model_id = parts[0].strip()
+            seconds_str = parts[1].strip()
+        else:
+            # 中文命令格式：设置模型冷却时间 模型ID 秒数
+            if command_str.startswith("设置模型冷却时间"):
+                parts = command_str[7:].strip().split(" ", 1)
+                if len(parts) < 2:
+                    raise ValueError("缺少冷却时间")
+                model_id = parts[0].strip()
+                seconds_str = parts[1].strip()
+            else:
+                # 兼容其他格式
+                parts = command_str.split(" ", 2)
+                if len(parts) < 3:
+                    raise ValueError("缺少必要参数")
+                model_id = parts[1].strip()
+                seconds_str = parts[2].strip()
+        
+        # 转换冷却时间为整数
         seconds = int(seconds_str.strip())
         
         if seconds < 1:

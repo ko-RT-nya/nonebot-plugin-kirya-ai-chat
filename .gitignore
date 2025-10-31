@@ -37,3 +37,5 @@ var/
 # 日志文件
 *.log
 .trae
+/logs
+/data/logs
