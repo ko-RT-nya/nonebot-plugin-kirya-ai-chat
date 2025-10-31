@@ -17,10 +17,14 @@ from .commands.split import is_split_enabled, get_split_prompt, split_text
 
 # ==================== 配置加载逻辑 ====================
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-CORE_CONFIG_FILE = os.path.join(DATA_DIR, "core_config.json")
 
+# 确保数据目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# 使用配置管理器
+from .utils.config import config_manager
+
+# 默认配置
 DEFAULT_CORE_CONFIG = {
     "api_keys": {
         "gemini": "",
@@ -42,41 +46,34 @@ DEFAULT_CORE_CONFIG = {
     }
 }
 
-def load_core_config() -> Dict:
-    try:
-        if not os.path.exists(CORE_CONFIG_FILE):
-            with open(CORE_CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(DEFAULT_CORE_CONFIG, f, ensure_ascii=False, indent=2)
-            return DEFAULT_CORE_CONFIG
-        
-        with open(CORE_CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"加载核心配置失败：{str(e)}，使用默认配置")
-        return DEFAULT_CORE_CONFIG
+# 确保配置管理器完全初始化并加载配置
+config_manager.initialize()
 
-CORE_CONFIG = load_core_config()
+# 从配置管理器加载核心配置
+# 为了获取整个配置对象，我们使用load_config方法而不是get_value
+CORE_CONFIG = config_manager.load_config("core_config.json")
 # ========================================================
 
 # ==================== 配置参数读取 ====================
-GEMINI_API_KEY = CORE_CONFIG["api_keys"]["gemini"]
-GEMINI_MODEL = CORE_CONFIG["models"]["gemini"]
-GEMINI_URL = CORE_CONFIG["urls"]["gemini"].format(
+# 从配置管理器读取配置参数
+GEMINI_API_KEY = config_manager.get_value("core_config.json", "api_keys.gemini", default="")
+GEMINI_MODEL = config_manager.get_value("core_config.json", "models.gemini", default="gemini-2.5-pro")
+GEMINI_URL = config_manager.get_value("core_config.json", "urls.gemini", default="https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={key}").format(
     model=GEMINI_MODEL, 
     key=GEMINI_API_KEY
 )
 
-DEEPSEEK_API_KEY = CORE_CONFIG["api_keys"]["deepseek"]
-DEEPSEEK_MODEL = CORE_CONFIG["models"]["deepseek"]
-DEEPSEEK_URL = CORE_CONFIG["urls"]["deepseek"]
+DEEPSEEK_API_KEY = config_manager.get_value("core_config.json", "api_keys.deepseek", default="")
+DEEPSEEK_MODEL = config_manager.get_value("core_config.json", "models.deepseek", default="deepseek-chat")
+DEEPSEEK_URL = config_manager.get_value("core_config.json", "urls.deepseek", default="https://api.deepseek.com/v1/chat/completions")
 
-PROXIES = CORE_CONFIG["proxies"]
+PROXIES = config_manager.get_value("core_config.json", "proxies", default={})
 
 USER_REQUEST_CACHE: Dict[str, datetime] = {}
-GEMINI_COOLDOWN = timedelta(seconds=CORE_CONFIG["rate_limit"]["gemini_cooldown"])
-DEEPSEEK_COOLDOWN = timedelta(seconds=CORE_CONFIG["rate_limit"]["deepseek_cooldown"])
+GEMINI_COOLDOWN = timedelta(seconds=config_manager.get_value("core_config.json", "rate_limit.gemini_cooldown", default=15))
+DEEPSEEK_COOLDOWN = timedelta(seconds=config_manager.get_value("core_config.json", "rate_limit.deepseek_cooldown", default=2))
 GLOBAL_REQUEST_CACHE: Dict[str, int] = {"count": 0, "last_reset": datetime.now()}
-GLOBAL_QPS_LIMIT = CORE_CONFIG["rate_limit"]["global_qps_limit"]
+GLOBAL_QPS_LIMIT = config_manager.get_value("core_config.json", "rate_limit.global_qps_limit", default=2)
 # ========================================================
 
 def is_allowed() -> Rule:

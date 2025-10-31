@@ -1,45 +1,18 @@
-import os
-import json
 import re
-from typing import Dict, List
+from typing import List
 from nonebot import get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 from . import register_command, is_admin
-from ..utils.config import load_config, save_config
-
-# 文本分割配置存储路径
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-SPLIT_CONFIG_FILE = os.path.join(DATA_DIR, "split_config.json")
-
-# 确保数据目录存在
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# 默认分割配置
-DEFAULT_SPLIT_CONFIG = {
-    "enabled": False,  # 默认关闭
-    "prompt": "请将你的回答分成多条简短消息，每条消息控制在1-2句话内（一般不多于20字）。"
-              "当需要分段时，请用【SPLIT】标记作为每条消息的结束。"
-              "确保内容连贯自然，符合QQ聊天场景的交流习惯，避免过长段落。"
-}
+from ..utils.config import config_manager
 
 def is_split_enabled() -> bool:
     """检查文本分割功能是否启用"""
-    config = load_config()
-    return config.get("split_enabled", False)
+    return config_manager.get_value("config.json", "split_enabled", False)
 
-# 保留split提示词的独立配置（从split_config.json读取）
 def get_split_prompt() -> str:
-    """获取文本分割提示词（仍从原文件读取）"""
-    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-    SPLIT_CONFIG_FILE = os.path.join(DATA_DIR, "split_config.json")
-    DEFAULT_PROMPT = "请将你的回答分成多条简短消息，每条消息控制在1-2句话内（一般不多于20字）。当需要分段时，请用【SPLIT】标记作为每条消息的结束。确保内容连贯自然，符合QQ聊天场景的交流习惯，避免过长段落。"
-    
-    try:
-        with open(SPLIT_CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
-            return config.get("prompt", DEFAULT_PROMPT)
-    except Exception:
-        return DEFAULT_PROMPT
+    """获取文本分割提示词"""
+    default_prompt = "请将你的回答分成多条简短消息，每条消息控制在1-2句话内（一般不多于20字）。当需要分段时，请用【SPLIT】标记作为每条消息的结束。确保内容连贯自然，符合QQ聊天场景的交流习惯，避免过长段落。"
+    return config_manager.get_value("split_config.json", "prompt", default_prompt)
 
 def split_text(text: str) -> List[str]:
     """根据【SPLIT】标记分割文本（移除标记并处理句尾情况）"""
@@ -89,9 +62,7 @@ async def handle_enable_split(event: MessageEvent, _: str) -> bool:
         await get_bot().send(event, "无权限执行此操作（仅管理员可启用文本分割）")
         return True
 
-    config = load_config()
-    config["split_enabled"] = True
-    if save_config(config):
+    if config_manager.set_value("config.json", "split_enabled", True):
         await get_bot().send(event, "已启用文本分割功能")
     else:
         await get_bot().send(event, "启用文本分割功能失败（存储错误）")
@@ -108,9 +79,7 @@ async def handle_disable_split(event: MessageEvent, _: str) -> bool:
         await get_bot().send(event, "无权限执行此操作（仅管理员可禁用文本分割）")
         return True
 
-    config = load_config()
-    config["split_enabled"] = False
-    if save_config(config):
+    if config_manager.set_value("config.json", "split_enabled", False):
         await get_bot().send(event, "已禁用文本分割功能")
     else:
         await get_bot().send(event, "禁用文本分割功能失败（存储错误）")

@@ -1,11 +1,18 @@
 # gemini_adapter/models/deepseek_chat.py
 from typing import Dict, Optional
 from .base_model import BaseModel
+from ..utils.config import config_manager
 
 class DeepSeekChatModel(BaseModel):
-    def __init__(self, api_key: str, proxies: Optional[Dict] = None):
+    def __init__(self, model_id: str = "deepseek-chat", api_key: str = "", base_url: Optional[str] = None, proxies: Optional[Dict] = None):
+        # 如果没有提供API密钥，从配置管理器获取
+        api_key = api_key or config_manager.get_value("core_config.json", "api_keys.deepseek", default="")
+        # 如果没有提供代理，从配置管理器获取
+        proxies = proxies or config_manager.get_value("core_config.json", "proxies", default={})
         super().__init__(api_key, proxies)
-        self.model_name = "deepseek-chat"
+        self.model_name = model_id
+        # 如果没有提供基础URL，从配置管理器获取或使用默认值
+        self._base_url = base_url or config_manager.get_value("core_config.json", "urls.deepseek", default="https://api.deepseek.com/v1/chat/completions")
         
     def prepare_request(self, user_msg: str, system_prompt: str = "") -> Dict:
         messages = []
@@ -39,7 +46,7 @@ class DeepSeekChatModel(BaseModel):
         
     @property
     def api_url(self) -> str:
-        return "https://api.deepseek.com/v1/chat/completions"
+        return self._base_url
         
     @property
     def headers(self) -> Dict[str, str]:

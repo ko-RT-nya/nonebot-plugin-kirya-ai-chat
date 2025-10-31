@@ -1,11 +1,25 @@
 # gemini_adapter/models/gemini_2_5_pro.py
 from typing import Dict, Optional
 from .base_model import BaseModel
+from ..utils.config import config_manager
 
 class Gemini25ProModel(BaseModel):
-    def __init__(self, api_key: str, proxies: Optional[Dict] = None):
-        super().__init__(api_key, proxies)
-        self.model_name = "gemini-2.5-pro"
+    """Gemini 2.5 Pro 模型适配器"""
+    
+    def __init__(self, model_id: str = "gemini-2.5-pro", api_key: str = "", proxies: Optional[Dict] = None):
+        """初始化模型
+        
+        Args:
+            model_id: 模型ID
+            api_key: API 密钥
+            proxies: 代理配置
+        """
+        # 如果没有提供API密钥，从配置管理器获取
+        self.api_key = api_key or config_manager.get_value("core_config.json", "api_keys.gemini", default="")
+        # 如果没有提供代理，从配置管理器获取
+        self.proxies = proxies or config_manager.get_value("core_config.json", "proxies", default={})
+        self.model_name = model_id
+        super().__init__(self.api_key, self.proxies)
         
     def prepare_request(self, user_msg: str, system_prompt: str = "") -> Dict:
         full_message = f"{system_prompt}\n\n用户消息：{user_msg}" if system_prompt else user_msg

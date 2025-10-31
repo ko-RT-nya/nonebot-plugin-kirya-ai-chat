@@ -1,36 +1,7 @@
 from typing import Dict, Callable, Awaitable, List, Union, Tuple
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment
 from nonebot import get_bot
-import os
-import json 
-
-# ==================== 管理员配置加载（修改） ====================
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-ADMIN_CONFIG_FILE = os.path.join(DATA_DIR, "admin_config.json")
-
-# 确保数据目录存在
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# 加载管理员配置
-def load_admin_config() -> List[str]:
-    """从外部文件加载管理员QQ列表"""
-    try:
-        if not os.path.exists(ADMIN_CONFIG_FILE):
-            # 初始化默认配置
-            default = {"admin_qq": ["757519749"]}
-            with open(ADMIN_CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(default, f, ensure_ascii=False, indent=2)
-            return default["admin_qq"]
-        
-        with open(ADMIN_CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
-            return config.get("admin_qq", [])
-    except Exception as e:
-        print(f"加载管理员配置失败：{str(e)}，使用空列表")
-        return []
-
-# 从配置文件加载管理员列表（替代硬编码）
-ADMIN_QQ: List[str] = load_admin_config()
+from ..utils.config import config_manager
 # ==============================================================
 
 CommandMetadata = Dict[str, Union[List[str], Callable, str]]
@@ -38,7 +9,10 @@ COMMAND_METADATA: Dict[str, CommandMetadata] = {}
 COMMAND_ALIASES: Dict[str, str] = {}
 
 def is_admin(user_id: str) -> bool:
-    return user_id in ADMIN_QQ
+    """检查用户是否为管理员"""
+    admin_list = config_manager.get_value("admin_config.json", "admin_qq", ["757519749"])
+    # 将admin_list中的所有元素转换为字符串进行比较
+    return user_id in [str(admin) for admin in admin_list]
 
 def register_command(
     command: Union[str, List[str]],

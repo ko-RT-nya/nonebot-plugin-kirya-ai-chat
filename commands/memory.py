@@ -7,12 +7,18 @@ from typing import Dict, List, Optional, Callable
 from nonebot import get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent
 from . import register_command, is_admin
+from ..utils.config import config_manager
 
-# 从外部配置导入路径信息（避免硬编码）
-from ..utils.config import DATA_DIR
+# 记忆存储路径
+DATA_DIR = config_manager.get_data_dir()
 MEMORY_DIR = os.path.join(DATA_DIR, "memories")
-os.makedirs(os.path.join(MEMORY_DIR, "users"), exist_ok=True)
-os.makedirs(os.path.join(MEMORY_DIR, "groups"), exist_ok=True)
+USER_MEMORY_DIR = os.path.join(MEMORY_DIR, "users")
+GROUP_MEMORY_DIR = os.path.join(MEMORY_DIR, "groups")
+
+# 确保数据目录存在并检查权限
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(USER_MEMORY_DIR, exist_ok=True)
+os.makedirs(GROUP_MEMORY_DIR, exist_ok=True)
 for dir_name in ["users", "groups"]:
     dir_path = os.path.join(MEMORY_DIR, dir_name)
     if not os.access(dir_path, os.W_OK):
@@ -140,10 +146,14 @@ async def update_memory(
             "timestamp": now
         })
         
-        # 检查是否需要生成总结（60条记录或24小时）
+        # 获取配置参数
+        summary_threshold = config_manager.get_value("config.json", "summary_threshold", 60)
+        summary_interval = config_manager.get_value("config.json", "summary_interval", 86400)
+        
+        # 检查是否需要生成总结
         need_summary = (
-            len(memory["history"]) >= 60 or
-            (now - memory["last_summary_time"] > 86400 and memory["history"])
+            len(memory["history"]) >= summary_threshold or
+            (now - memory["last_summary_time"] > summary_interval and memory["history"])
         )
         
         if need_summary:
@@ -181,8 +191,12 @@ def get_memory_content(key: str) -> str:
         content.append(memory["summary"])
     
     if memory["history"]:
+        # 获取最大历史记录数配置
+        max_history = config_manager.get_value("config.json", "max_history", 30)
         content.append("\n[最近对话]")
-        for item in memory["history"]:
+        # 限制历史记录数量
+        recent_history = memory["history"][-max_history*2:]  # 每个对话包含用户和AI两条消息
+        for item in recent_history:
             content.append(f"{'用户' if item['role'] == 'user' else 'AI'}: {item['content']}")
     
     return "\n".join(content)
@@ -238,4 +252,57 @@ async def handle_show_memory_status(event: MessageEvent, _: str) -> bool:
     ]
     
     await get_bot().send(event, f"当前{'个人' if 'user_' in key else '群组'}记忆状态:\n" + "\n".join(status))
+    return True
+
+@register_command(
+    command=["记忆管理", "memory config"],
+    description="配置AI记忆相关参数（仅管理员）",
+    usage="\\记忆管理 [参数名] [参数值]\n例如：\\记忆管理 max_history 50"
+)
+async def handle_memory_config(event: MessageEvent, args: str) -> bool:
+    user_id = str(event.user_id)
+    if not is_admin(user_id):
+        await get_bot().send(event, "无权限执行此操作（仅管理员可配置记忆参数）")
+        return True
+
+    # 获取参数
+    parts = args.strip().split()
+    if len(parts) < 2:
+        # 显示当前配置
+        max_history = config_manager.get_value("config.json", "max_history", 30)
+        summary_threshold = config_manager.get_value("config.json", "summary_threshold", 50)
+        summary_interval = config_manager.get_value("config.json", "summary_interval", 3600)
+        
+        reply = f"当前记忆配置:\n"
+        reply += f"- 最大历史消息数: {max_history}\n"
+        reply += f"- 触发总结阈值: {summary_threshold}\n"
+        reply += f"- 总结间隔(秒): {summary_interval}\n"
+        reply += "\n使用方式: \\记忆管理 [参数名] [参数值]"
+        await get_bot().send(event, reply)
+        return True
+    
+    param_name = parts[0].lower()
+    param_value = " ".join(parts[1:])
+    
+    try:
+        # 更新配置
+        if param_name == "max_history":
+            if config_manager.set_value("config.json", "max_history", int(param_value)):
+                await get_bot().send(event, f"已更新记忆配置: {param_name} = {param_value}")
+            else:
+                await get_bot().send(event, "更新配置失败（存储错误）")
+        elif param_name == "summary_threshold":
+            if config_manager.set_value("config.json", "summary_threshold", int(param_value)):
+                await get_bot().send(event, f"已更新记忆配置: {param_name} = {param_value}")
+            else:
+                await get_bot().send(event, "更新配置失败（存储错误）")
+        elif param_name == "summary_interval":
+            if config_manager.set_value("config.json", "summary_interval", int(param_value)):
+                await get_bot().send(event, f"已更新记忆配置: {param_name} = {param_value}")
+            else:
+                await get_bot().send(event, "更新配置失败（存储错误）")
+        else:
+            await get_bot().send(event, f"未知的参数名: {param_name}")
+    except ValueError:
+        await get_bot().send(event, "参数值必须为数字")
     return True

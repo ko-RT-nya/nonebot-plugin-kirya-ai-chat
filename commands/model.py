@@ -1,72 +1,37 @@
 # gemini_adapter/commands/model.py
-import os
-import json
 from typing import Dict, Optional
 from nonebot import get_bot
 from nonebot.adapters.onebot.v11 import MessageEvent
 from . import register_command, is_admin
+from ..utils.config import config_manager
 from ..models.model_factory import ModelFactory
 
-# 模型配置存储路径
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-MODEL_CONFIG_FILE = os.path.join(DATA_DIR, "model_config.json")
-
-# 确保数据目录存在
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# 默认模型配置
-DEFAULT_MODEL_CONFIG = {
-    "current_model": "gemini-2.5-pro",
-    "models": {
+def load_model_config() -> Dict[str, any]:
+    """加载模型配置（支持完全自定义模型列表）"""
+    # 默认模型配置
+    default_models = {
         "gemini-2.5-pro": "Google Gemini 2.5 Pro",
         "gemini-2.5-flash": "Google Gemini 2.5 Flash",
         "deepseek-chat": "DeepSeek Chat",
         "deepseek-reasoner": "DeepSeek Reasoner"
-    },
-    "api_keys": {
-        "gemini-2.5-pro": "",
-        "gemini-2.5-flash": "",
-        "deepseek-chat": "",
-        "deepseek-reasoner": ""
-    },
-    "cooldowns": {
-        "gemini-2.5-pro": 15,
-        "gemini-2.5-flash": 10,
-        "deepseek-chat": 2,
-        "deepseek-reasoner": 3
     }
-}
-
-def load_model_config() -> Dict[str, any]:
-    """加载模型配置（支持完全自定义模型列表）"""
-    try:
-        if not os.path.exists(MODEL_CONFIG_FILE):
-            # 初始化默认配置（仅首次运行时）
-            with open(MODEL_CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(DEFAULT_MODEL_CONFIG, f, ensure_ascii=False, indent=2)
-            return DEFAULT_MODEL_CONFIG
-            
-        with open(MODEL_CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
-            # 兼容旧配置：如果缺少必要字段，补充默认值
-            if "models" not in config:
-                config["models"] = DEFAULT_MODEL_CONFIG["models"]
-            if "current_model" not in config:
-                config["current_model"] = next(iter(config["models"].keys()))  # 默认第一个模型
-            if "api_keys" not in config:
-                config["api_keys"] = {}
-            if "cooldowns" not in config:
-                config["cooldowns"] = {}
-            return config
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"加载模型配置失败：{str(e)}，使用默认配置")
-        return DEFAULT_MODEL_CONFIG
+    
+    # 从配置管理器获取配置
+    config = {}
+    config["current_model"] = config_manager.get_value("model_config.json", "current_model", "gemini-2.5-pro")
+    config["models"] = config_manager.get_value("model_config.json", "models", default_models)
+    config["api_keys"] = config_manager.get_value("model_config.json", "api_keys", {})
+    config["cooldowns"] = config_manager.get_value("model_config.json", "cooldowns", {})
+    
+    return config
 
 def save_model_config(config: Dict[str, any]) -> bool:
     """保存模型配置"""
     try:
-        with open(MODEL_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
+        # 使用配置管理器保存各配置项
+        for key, value in config.items():
+            if not config_manager.set_value("model_config.json", key, value):
+                return False
         return True
     except Exception as e:
         print(f"保存模型配置失败：{str(e)}")
@@ -85,22 +50,32 @@ async def handle_switch_model(event: MessageEvent, command_text: str) -> bool:
         return True
 
     try:
-        # 修复：使用split()分割所有空格（支持多个空格/全角空格），取第三个元素作为模型ID
+        # 使用split()分割所有空格（支持多个空格/全角空格），取第三个元素作为模型ID
         parts = command_text.split()
         if len(parts) < 2:
             raise ValueError("缺少模型ID")
         model_id = parts[2].strip()  # 指令格式：\切换模型 模型ID → parts[0]是'\切换模型', parts[1]是模型ID
         
-        config = load_model_config()
-        if model_id not in config["models"]:
-            models_list = "\n".join([f"- {k}: {v}" for k, v in config["models"].items()])
+        # 默认模型配置
+        default_models = {
+            "gemini-2.5-pro": "Google Gemini 2.5 Pro",
+            "gemini-2.5-flash": "Google Gemini 2.5 Flash",
+            "deepseek-chat": "DeepSeek Chat",
+            "deepseek-reasoner": "DeepSeek Reasoner"
+        }
+        
+        models = config_manager.get_value("model_config.json", "models", default_models)
+        if model_id not in models:
+            models_list = "\n".join([f"- {k}: {v}" for k, v in models.items()])
             await get_bot().send(event, f"模型ID不存在！可用模型：\n{models_list}")
             return True
         
-        config["current_model"] = model_id
-        if save_model_config(config):
+        # 直接使用配置管理器设置当前模型
+        if config_manager.set_value("model_config.json", "current_model", model_id):
             await get_bot().send(event, 
-                f"已切换模型为：{model_id}（{config['models'][model_id]}）")
+                f"已切换模型为：{model_id}（{models[model_id]}）")
+            # 清除模型工厂的缓存
+            ModelFactory._model_instances = {}
         else:
             await get_bot().send(event, "切换模型失败（存储错误）")
         return True
@@ -203,5 +178,4 @@ async def handle_set_cooldown(event: MessageEvent, command_text: str) -> bool:
 
 def get_current_model() -> str:
     """获取当前模型ID（供主程序调用）"""
-    config = load_model_config()
-    return config["current_model"]
+    return config_manager.get_value("model_config.json", "current_model", "gemini-2.5-pro")
