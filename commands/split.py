@@ -11,27 +11,28 @@ def is_split_enabled() -> bool:
 
 def get_split_prompt() -> str:
     """获取文本分割提示词"""
-    default_prompt = "请将你的回答分成多条简短消息，每条消息控制在1-2句话内（一般不多于20字）。当需要分段时，请用【SPLIT】标记作为每条消息的结束。确保内容连贯自然，符合QQ聊天场景的交流习惯，避免过长段落。"
+    default_prompt = "请将你的回答分成多条简短消息，每条消息控制在1-2句话内（一般不多于20字）。当需要分段时，请使用换行符\n作为每条消息的结束。确保内容连贯自然，符合QQ聊天场景的交流习惯，避免过长段落。"
     return config_manager.get_value("split_config.json", "prompt", default_prompt)
 
 def split_text(text: str) -> List[str]:
-    """根据【SPLIT】标记分割文本（移除标记并处理句尾情况）"""
+    """根据换行符分割文本（处理句尾情况）"""
     if not text:
         return []
     
-    # 按标记分割并移除所有残留的标记，同时过滤空内容
+    # 按换行符分割并过滤空内容
     parts = [
-        part.replace("【SPLIT】", "").strip()  # 彻底移除标记
-        for part in text.split("【SPLIT】") 
-        if part.replace("【SPLIT】", "").strip()  # 确保内容非空
+        part.strip()  # 去除首尾空白
+        for part in text.split('\n') 
+        if part.strip()  # 确保内容非空
     ]
     
-    # 如果没有分割标记，作为备选方案自动分割
-    if len(parts) == 1:
+    # 如果使用换行符分割后只有一个部分或需要进一步细分
+    # 自动分割逻辑保留，用于超长消息的处理
+    if len(parts) == 1 and len(parts[0]) > 200:  # 只有一个部分且长度超过200才自动分割
         auto_split_parts = []
         current_part = ""
         # 按原文本中的标点/空格分割成短句（保留原句标点）
-        sentences = re.split(r'([。，,；;！!？?\s])', text)  # 分割并保留分隔符
+        sentences = re.split(r'([。，,；;！!？?\s])', parts[0])  # 分割并保留分隔符
         sentences = [s for s in sentences if s.strip()]  # 过滤空内容
         
         for sent in sentences:
@@ -47,7 +48,7 @@ def split_text(text: str) -> List[str]:
         if current_part:
             auto_split_parts.append(current_part)
         
-        return auto_split_parts if auto_split_parts else [text]
+        return auto_split_parts if auto_split_parts else parts
     
     return parts
 

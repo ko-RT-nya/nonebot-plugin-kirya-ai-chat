@@ -223,10 +223,8 @@ async def generate_summary(
 
 分析要求：
 1. 识别并总结关键话题和讨论内容
-2. 记录用户的主要偏好和关注点
-3. 提取重要的信息和数据点
-4. 保持总结的连贯性和完整性
-5. 语言简洁明了，不超过600字
+2. 记录每个用户的主要偏好和关注点
+3. 语言简洁明了，不超过600字
 
 请基于所有提供的信息生成一份高质量的总结。
 """
@@ -340,12 +338,18 @@ async def update_memory(
         # 计算有效信息长度（去掉标记信息性质的内容）
         effective_length = calculate_effective_length(memory["history"])
         
+        # 添加日志记录当前状态，便于调试
+        print(f"记忆更新状态 - 历史记录数: {len(memory['history'])}, 有效内容长度: {effective_length}")
+        
         # 检查是否需要生成总结
         # 根据需求：历史记录超过120条 或 有效信息超过2000字时触发总结
         need_summary = (
             len(memory["history"]) >= 120 or
             effective_length >= 2000
         )
+        
+        # 添加日志记录是否需要总结
+        print(f"是否需要生成总结: {need_summary}, 模型参数是否完整: {all([current_model, prepare_request, parse_response, api_url, headers])}")
         
         if need_summary and all([current_model, prepare_request, parse_response, api_url, headers]):
             # 构建用于总结的完整信息：结合之前的总结和现有历史记录
@@ -400,41 +404,12 @@ async def update_memory_chat(
     
     先添加用户消息，再添加AI消息（支持分割）
     """
-    # 添加用户消息
-    await update_memory(
-        event=event,
-        content=user_msg,
-        role="user",
-        current_model=current_model,
-        prepare_request=prepare_request,
-        parse_response=parse_response,
-        api_url=api_url,
-        headers=headers,
-        proxies=proxies
-    )
-    
-    # 添加AI回复 - 根据是否分割选择不同的方式
-    if split_parts and len(split_parts) > 1:
-        # 如果有分割的消息部分，为每个部分创建单独的AI记忆条目
-        for part in split_parts:
-            await update_memory(
-                event=event,
-                content=part,
-                role="ai",
-                # 后续消息不需要再次传递模型参数，避免重复生成总结
-                current_model=None,
-                prepare_request=None,
-                parse_response=None,
-                api_url=None,
-                headers=None,
-                proxies=None
-            )
-    else:
-        # 否则添加完整的AI回复
+    # 添加用户消息 - 只有当user_msg不为空时才添加
+    if user_msg and user_msg.strip():
         await update_memory(
             event=event,
-            content=ai_reply,
-            role="ai",
+            content=user_msg,
+            role="user",
             current_model=current_model,
             prepare_request=prepare_request,
             parse_response=parse_response,
@@ -442,6 +417,51 @@ async def update_memory_chat(
             headers=headers,
             proxies=proxies
         )
+    
+    # 添加AI回复 - 根据是否分割选择不同的方式，且仅当ai_reply不为空时添加
+    if ai_reply:
+        if split_parts and len(split_parts) > 1:
+            # 如果有分割的消息部分，为每个部分创建单独的AI记忆条目
+            for index, part in enumerate(split_parts):
+                # 第一个分割部分携带完整模型参数，以便可能触发自动总结
+                # 后续部分不携带模型参数，避免重复检查和生成总结
+                if index == 0:
+                    await update_memory(
+                        event=event,
+                        content=part,
+                        role="ai",
+                        current_model=current_model,
+                        prepare_request=prepare_request,
+                        parse_response=parse_response,
+                        api_url=api_url,
+                        headers=headers,
+                        proxies=proxies
+                    )
+                else:
+                    await update_memory(
+                        event=event,
+                        content=part,
+                        role="ai",
+                        current_model=None,
+                        prepare_request=None,
+                        parse_response=None,
+                        api_url=None,
+                        headers=None,
+                        proxies=None
+                    )
+        else:
+            # 否则添加完整的AI回复
+            await update_memory(
+                event=event,
+                content=ai_reply,
+                role="ai",
+                current_model=current_model,
+                prepare_request=prepare_request,
+                parse_response=parse_response,
+                api_url=api_url,
+                headers=headers,
+                proxies=proxies
+            )
 
 def parse_role_info(role: str) -> str:
     """解析role字段，提取用户信息"""

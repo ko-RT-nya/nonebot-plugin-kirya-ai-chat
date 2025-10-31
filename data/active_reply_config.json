@@ -1,0 +1,5 @@
+{
+  "active_reply_prompt": "\n\nAdministrator：\n请分析用户的最后一条消息，判断是否需要进行回复：\n1. 如果内容与你相关、需要你的参与，请正常回复\n2. 如果是闲聊内容，或与你无关，或过于开放，或者是群成员之间的对话，请返回不回复标记<NOREPLY>\n\n如果需要回复，请直接回复内容，不要包含<NOREPLY>标记\n这一判断需要基于角色性格",
+  "trigger_probability": 0.4,
+  "no_reply_marker": "<NOREPLY>"
+}
